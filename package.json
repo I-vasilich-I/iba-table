@@ -1,0 +1,19 @@
+{
+  "name": "iba-table",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/I-vasilich-I/iba-table.git"
+  },
+  "author": "Oleg Vaskevich",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/I-vasilich-I/iba-table/issues"
+  },
+  "homepage": "https://github.com/I-vasilich-I/iba-table#readme"
+}
