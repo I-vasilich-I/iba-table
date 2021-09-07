@@ -6,7 +6,12 @@ const USERS_ENDPOINT = `${API_URL}/users/`;
 const EDIT_USER_ENDPOINT = `${API_URL}/edit/`;
 const CREATE_USER_ENDPOINT = `${API_URL}/create`;
 const DELETE_USER_ENDPOINT = `${API_URL}/delete/`;
-
+let users;
+const tableParams = {
+  search: '',
+  sort: 'Name',
+  order: true,
+}
 
 const fetchUsers = async () => {
   try {
@@ -29,6 +34,7 @@ const editUser = async (id, data) => {
     });
     if (res.ok) {
       alert('user was changed');
+      generateTable();
       closeModal();
     }
   } catch (e) {
@@ -47,6 +53,7 @@ const createUser = async (data) => {
     });
     if (res.ok) {
       alert('user was created');
+      generateTable();
       closeModal();
     } 
   } catch (e) {
@@ -61,43 +68,33 @@ const deleteUser = async (id) => {
     });
     if (response.ok) {
       alert('user was deleted');
+      generateTable();
     }
   } catch (e) {
     alert(`something went wrong: ${e}`);
   }
 }
 
-const data = await fetchUsers();
-
-const createBtn = create('button');
-createBtn.innerText = 'new user';
-
+const nav = create('nav', 'nav');
+const searchContainer = create('div', 'search__container', null, nav);
+const searchInput = create('input', 'search__input', null, searchContainer, ['type', 'search'], ['placeholder', 'Search']);
+const searchButton = create('button', 'search__button', null, searchContainer);
+searchButton.innerText = 'Search';
+const createBtn = create('button', 'nav__button', null, nav);
 const table = create('table', 'table');
 body.prepend(table);
-body.prepend(createBtn);
+body.prepend(nav);
 const thead = create('thead', 'table__thead', null, table);
 const trThead = create('tr', 'table__thead', null, thead);
-const TheadName = create('th', null, null, trThead);
+const TheadName = create('th', 'th__name', null, trThead);
 TheadName.innerText = 'Name';
-const TheadDescription = create('th', null, null, trThead);
+const TheadDescription = create('th', 'th__description th__description--hidden', null, trThead);
 TheadDescription.innerText = 'Description';
-const TheadData = create('th', null, null, trThead);
-TheadData.innerText = 'Data';
+const TheadData = create('th', 'th__date th__date--hidden', null, trThead);
+TheadData.innerText = 'Date';
 const TheadAction = create('th', null, null, trThead);
 TheadAction.innerText = 'Action';
 const tbody = create('tbody', 'table__body', null, table);
-
-data.forEach((el) => {
-  const trTbody = create('tr', null, null, tbody, ['id', el.id]);
-  create('td', null, null, trTbody).innerText = el.Name;
-  create('td', null, null, trTbody).innerText = el.Description;
-  create('td', null, null, trTbody).innerText = el.Date;
-  create('td', 'table__action', null, trTbody, ['actionid', el.id]).innerHTML = `
-    <div class="table__edit">edit</div>
-    <div class="table__delete">delete</div>
-    `;
-});
-
 const modal = create('form', 'modal modal--closed');
 body.prepend(modal);
 const overlay = create('div', 'overlay overlay--hidden');
@@ -110,6 +107,20 @@ const submit = create('input', 'submit', null, buttonsDiv, ['type', 'button']);
 const close = create('input', 'close', null, buttonsDiv, ['type', 'button']);
 submit.value = 'OK';
 close.value = 'Cancel';
+
+generateTable();
+
+searchButton.onclick = () => {
+  tableParams.search = searchInput.value.toLowerCase();
+  generateTable();
+}
+
+searchInput.oninput = (e) => {
+  if (!e.target.value) {
+    tableParams.search = '';
+    generateTable();
+  }
+}
 
 createBtn.onclick = () => {
   openModal();
@@ -127,6 +138,9 @@ body.addEventListener('click', (e) => {
   const editBtn = target.closest('.table__edit');
   const deleteBtn = target.closest('.table__delete');
   const overlayClick = target.closest('.overlay');
+  const thName = target.closest('.th__name');
+  const thDescription = target.closest('.th__description');
+  const thDate = target.closest('.th__date');
 
   if (closeBtn || overlayClick) {
     closeModal();
@@ -135,7 +149,7 @@ body.addEventListener('click', (e) => {
   if (editBtn) {
     openModal();
     const { offsetParent: { dataset: {actionid} }} = target;
-    const { Name, Description, Date} = data.filter((elem) => elem.id == actionid)[0];
+    const { Name, Description, Date} = users.filter((elem) => elem.id == actionid)[0];
     nameInput.value = Name;
     descriptionInput.value = Description;
     dateInput.value = Date;
@@ -143,10 +157,6 @@ body.addEventListener('click', (e) => {
       const isChanged = (nameInput.value !== Name || descriptionInput.value !== Description || dateInput.value !== Date) 
       const isEmpty =  !(nameInput.value !== '' && descriptionInput.value !== '' && dateInput.value !== '');
       if (isChanged && !isEmpty) {
-        const { children } = document.querySelector(`[data-id="${actionid}"]`);
-        children[0].innerText = nameInput.value;
-        children[1].innerText = descriptionInput.value;
-        children[2].innerText = dateInput.value;
         editUser(actionid, { Name: nameInput.value, Description: descriptionInput.value, Date: dateInput.value});
         return;
       }
@@ -160,8 +170,37 @@ body.addEventListener('click', (e) => {
     const { offsetParent: { dataset: {actionid} }} = target;
     deleteUser(actionid);
   }
-});
 
+  if (thName) {
+    tableParams.sort = 'Name';
+    tableParams.order = thName.classList.contains('th__name--up') ? true : false;
+    generateTable();
+    thName.classList.remove('th__name--hidden');
+    thName.classList.toggle('th__name--up');
+    TheadDescription.className = 'th__description th__description--hidden';
+    TheadData.className = 'th__date th__date--hidden';
+  }
+
+  if (thDescription) {
+    tableParams.sort = 'Description';
+    tableParams.order = thDescription.classList.contains('th__description--up') ? true : false;
+    generateTable();
+    thDescription.classList.remove('th__description--hidden');
+    thDescription.classList.toggle('th__description--up');
+    TheadName.className = 'th__name th__name--hidden';
+    TheadData.className = 'th__date th__date--hidden';
+  }
+
+  if (thDate) {
+    tableParams.sort = 'Date';
+    tableParams.order = thDate.classList.contains('th__date--up') ? true : false;
+    generateTable();
+    thDate.classList.remove('th__date--hidden');
+    thDate.classList.toggle('th__date--up');
+    TheadName.className = 'th__name th__name--hidden';
+    TheadDescription.className = 'th__description th__description--hidden';
+  }
+});
 
 function closeModal() {
   overlay.classList.add('overlay--hidden');
@@ -171,4 +210,25 @@ function closeModal() {
 function openModal() {
   overlay.classList.remove('overlay--hidden');
   modal.classList.remove('modal--closed');
+}
+
+async function generateTable() {
+  const { search, sort, order } = tableParams;
+  tbody.innerHTML = '';
+  users = await fetchUsers();
+  const data = search ? users.filter((elem) => elem.Name.toLowerCase().includes(search)) : users;
+  data.sort((a, b) => {
+    if (a[sort] > b[sort]) return order ? 1 : -1;
+    if (a[sort] < b[sort]) return order ? -1 : 1;
+    return 0;
+    }).forEach((el) => {
+    const trTbody = create('tr', null, null, tbody, ['id', el.id]);
+    create('td', null, null, trTbody).innerText = el.Name;
+    create('td', null, null, trTbody).innerText = el.Description;
+    create('td', null, null, trTbody).innerText = el.Date;
+    create('td', 'table__action', null, trTbody, ['actionid', el.id]).innerHTML = `
+      <div class="table__edit"></div>
+      <div class="table__delete"></div>
+      `;
+  });
 }
