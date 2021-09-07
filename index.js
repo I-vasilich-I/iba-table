@@ -1,5 +1,3 @@
-import create from './helpers.js'
-
 const { body } = document;
 const API_URL = `http://212.98.184.15:8080`;
 const USERS_ENDPOINT = `${API_URL}/users/`;
@@ -161,7 +159,7 @@ body.addEventListener('click', (e) => {
         return;
       }
       
-      !isChanged ? alert('You have to change data before submiting') : alert(`You can't pass an empty data, be sure to enter all inputs`);
+      !isChanged ? alert('You have to change data before submitting') : alert(`You can't pass an empty data, be sure to enter all inputs`);
       return;
     }
   }
@@ -202,6 +200,8 @@ body.addEventListener('click', (e) => {
   }
 });
 
+// helpers
+
 function closeModal() {
   overlay.classList.add('overlay--hidden');
   modal.classList.add('modal--closed');
@@ -231,4 +231,41 @@ async function generateTable() {
       <div class="table__delete"></div>
       `;
   });
+}
+
+function create(el, classNames, child, parent, ...dataAttr) {
+  let element = null;
+  try {
+    element = document.createElement(el);
+  } catch (error) {
+    throw new Error('Unable to create HTMLElement! Wrong data')
+  }
+
+  if (classNames) element.classList.add(...classNames.split(' '));
+  
+  if (child && Array.isArray(child)) {
+    child.forEach((childElement) => childElement && element.appendChild(childElement));
+  } else if (child && typeof child === 'object') {
+    element.appendChild(child);
+  } else if (child && typeof child === 'string') {
+    element.innerHTML = child;
+  }
+
+  if (parent) {
+    parent.appendChild(element);
+  }
+
+  if (dataAttr.length) {
+    dataAttr.forEach(([ attrName, attrValue ]) => {
+      if (attrValue === '') {
+        element.setAttribute(attrName, '');
+      } 
+      if (attrName.match(/value|placeholder|rows|autocorretc|spellcheck|type|src|alt/)) {
+        element.setAttribute(attrName, attrValue);
+      } else {
+        element.dataset[attrName] = attrValue;
+      }
+    });
+  }
+  return element;
 }
