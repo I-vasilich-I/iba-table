@@ -11,68 +11,6 @@ const tableParams = {
   order: true,
 }
 
-const fetchUsers = async () => {
-  try {
-    const res = await fetch(USERS_ENDPOINT);
-    const data = await res.json();
-    return data;
-  } catch (e) {
-    alert(`something went wrong: ${e}`)
-  }
-}
-
-const editUser = async (id, data) => {
-  try {
-    const res = await fetch(`${EDIT_USER_ENDPOINT}${id}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    if (res.ok) {
-      alert('user was changed');
-      generateTable();
-      closeModal();
-    }
-  } catch (e) {
-    alert(`something went wrong: ${e}`)
-  }
-}
-
-const createUser = async (data) => {
-  try {
-    const res = await fetch(`${CREATE_USER_ENDPOINT}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    if (res.ok) {
-      alert('user was created');
-      generateTable();
-      closeModal();
-    } 
-  } catch (e) {
-    alert(`something went wrong: ${e}`);
-  }
-}
-
-const deleteUser = async (id) => {
-  try {
-    const response = await fetch(`${DELETE_USER_ENDPOINT}${id}`, {
-      method: 'DELETE',
-    });
-    if (response.ok) {
-      alert('user was deleted');
-      generateTable();
-    }
-  } catch (e) {
-    alert(`something went wrong: ${e}`);
-  }
-}
-
 const nav = create('nav', 'nav');
 const searchContainer = create('div', 'search__container', null, nav);
 const searchInput = create('input', 'search__input', null, searchContainer, ['type', 'search'], ['placeholder', 'Search']);
@@ -80,8 +18,8 @@ const searchButton = create('button', 'search__button', null, searchContainer);
 searchButton.innerText = 'Search';
 const createBtn = create('button', 'nav__button', null, nav);
 const table = create('table', 'table');
-body.prepend(table);
-body.prepend(nav);
+const alertDiv = create('div', 'alert__container alert__container--hidden');
+alertDiv.innerText = '';
 const thead = create('thead', 'table__thead', null, table);
 const trThead = create('tr', 'table__thead', null, thead);
 const TheadName = create('th', 'th__name', null, trThead);
@@ -94,21 +32,38 @@ const TheadAction = create('th', null, null, trThead);
 TheadAction.innerText = 'Action';
 const tbody = create('tbody', 'table__body', null, table);
 const modal = create('form', 'modal modal--closed');
-body.prepend(modal);
 const overlay = create('div', 'overlay overlay--hidden');
-body.prepend(overlay);
 const nameInput = create('input', null, null, modal, ['placeholder', 'Name'], ['type', 'text']);
 const descriptionInput = create('input', null, null, modal, ['placeholder', 'Description'], ['type', 'text']);
 const dateInput = create('input', null, null, modal, ['placeholder', 'Date'], ['type', 'date']);
 const buttonsDiv = create('div', 'buttons__container', null, modal);
 const submit = create('input', 'submit', null, buttonsDiv, ['type', 'button']);
-const close = create('input', 'close', null, buttonsDiv, ['type', 'button']);
+const cancel = create('input', 'close', null, buttonsDiv, ['type', 'button']);
 submit.value = 'OK';
-close.value = 'Cancel';
+cancel.value = 'Cancel';
+const popup = create('div', 'popup popup--closed');
+popup.innerHTML = 
+`
+  <h3>
+    Are you sure?
+  </h3>
+  <div class="popup__buttons">
+    <button class="button__yes">Yes</button>
+    <button class="button__no">No</button>
+  </div> 
+`;
 
-generateTable();
+body.prepend(table);
+body.prepend(alertDiv);
+body.prepend(nav);
+body.prepend(modal);
+body.prepend(popup);
+body.prepend(overlay);
+
+generateTable(true);
 
 searchButton.onclick = () => {
+  if (!searchInput.value) return;
   tableParams.search = searchInput.value.toLowerCase();
   generateTable();
 }
@@ -120,8 +75,18 @@ searchInput.oninput = (e) => {
   }
 }
 
+searchInput.onkeypress = (e) => {
+  if (e.key === 'Enter' && searchInput.value) {
+    tableParams.search = searchInput.value.toLowerCase();
+    generateTable();
+  }
+}
+
 createBtn.onclick = () => {
   openModal();
+  nameInput.value = '';
+  descriptionInput.value = '';
+  dateInput.value = '';
   submit.onclick = () => {
     const isValidData = nameInput.value !== '' && descriptionInput.value !== '' && dateInput.value !== '';
     if (isValidData) {
@@ -139,9 +104,16 @@ body.addEventListener('click', (e) => {
   const thName = target.closest('.th__name');
   const thDescription = target.closest('.th__description');
   const thDate = target.closest('.th__date');
+  const yesBtn = target.closest('.button__yes');
+  const noBtn = target.closest('.button__no');
 
-  if (closeBtn || overlayClick) {
+  if (closeBtn) {
     closeModal();
+  }
+
+  if (overlayClick) {
+    closeModal();
+    closePopup();
   }
 
   if (editBtn) {
@@ -159,15 +131,24 @@ body.addEventListener('click', (e) => {
         return;
       }
       
-      !isChanged ? alert('You have to change data before submitting') : alert(`You can't pass an empty data, be sure to enter all inputs`);
+      !isChanged ? showNotification('You have to change data before submitting', true) : showNotification(`You can't pass an empty data, be sure to enter all inputs`, true);
       return;
     }
   }
 
   if (deleteBtn) {
     const { offsetParent: { dataset: {actionid} }} = target;
-    deleteUser(actionid);
+    popup.value = actionid;
+    openPopup();
   }
+
+  if (yesBtn) {
+    closePopup();
+    deleteUser(popup.value);
+    popup.value = null;
+  }
+
+  if (noBtn) closePopup();
 
   if (thName) {
     tableParams.sort = 'Name';
@@ -212,10 +193,31 @@ function openModal() {
   modal.classList.remove('modal--closed');
 }
 
-async function generateTable() {
+function openPopup() {
+  overlay.classList.remove('overlay--hidden');
+  popup.classList.remove('popup--closed');
+}
+
+function closePopup() {
+  overlay.classList.add('overlay--hidden');
+  popup.classList.add('popup--closed');
+}
+
+function showNotification(text, red = false) {
+  alertDiv.innerText = text;
+  if (red) alertDiv.classList.add('alert__container--red');
+  alertDiv.classList.remove('alert__container--hidden');
+  
+  setTimeout(() => {
+    alertDiv.classList.add('alert__container--hidden');
+    alertDiv.classList.remove('alert__container--red');
+  }, 4000);
+}
+
+async function generateTable(load = false) {
   const { search, sort, order } = tableParams;
   tbody.innerHTML = '';
-  users = await fetchUsers();
+  if (load) users = await fetchUsers();
   const data = search ? users.filter((elem) => elem.Name.toLowerCase().includes(search)) : users;
   data.sort((a, b) => {
     if (a[sort] > b[sort]) return order ? 1 : -1;
@@ -268,4 +270,66 @@ function create(el, classNames, child, parent, ...dataAttr) {
     });
   }
   return element;
+}
+
+async function fetchUsers() {
+  try {
+    const res = await fetch(USERS_ENDPOINT);
+    const data = await res.json();
+    return data;
+  } catch (e) {
+    showNotification(`something went wrong: ${e}`, true);
+  }
+}
+
+async function editUser(id, data) {
+  try {
+    const res = await fetch(`${EDIT_USER_ENDPOINT}${id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      showNotification('user was changed');
+      generateTable(true);
+      closeModal();
+    }
+  } catch (e) {
+    showNotification(`something went wrong: ${e}`, true);
+  }
+}
+
+async function createUser(data) {
+  try {
+    const res = await fetch(`${CREATE_USER_ENDPOINT}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      showNotification('user was created');
+      generateTable(true);
+      closeModal();
+    } 
+  } catch (e) {
+    showNotification(`something went wrong: ${e}`, true);
+  }
+}
+
+async function deleteUser(id) {
+  try {
+    const response = await fetch(`${DELETE_USER_ENDPOINT}${id}`, {
+      method: 'DELETE',
+    });
+    if (response.ok) {
+      showNotification('user was deleted');
+      generateTable(true);
+    }
+  } catch (e) {
+    showNotification(`something went wrong: ${e}`, true);
+  }
 }
